@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rjfwk (글자) 복구기 - 오타 복구 솔루션</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        .neon-shadow-cyan {
+            box-shadow: 0 0 15px rgba(34, 211, 238, 0.3);
+        }
+
+        .neon-text-cyan {
+            color: #22d3ee;
+            text-shadow: 0 0 5px rgba(34, 211, 238, 0.5);
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #22d3ee;
+            box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.2);
+        }
+
+        /* Toast Animation */
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .toast {
+            animation: slideUp 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center p-4 md:p-8">
+
+    <!-- Header -->
+    <header class="w-full max-w-4xl text-center mb-8">
+        <h1 class="text-4xl md:text-5xl font-extrabold mb-2 neon-text-cyan tracking-tight">
+            <i class="fas fa-keyboard mr-2"></i>Rjfwk 복구기
+        </h1>
+        <p class="text-slate-400 text-lg">실수로 친 영타/한타를 즉시 복구하세요</p>
+    </header>
+
+    <!-- Main Content -->
+    <main class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Input Section -->
+        <section class="flex flex-col gap-3">
+            <label class="text-sm font-semibold text-slate-300 ml-1">
+                <i class="fas fa-edit mr-1"></i> 입력창 (dkssud / ㅗ디ㅣㅐ)
+            </label>
+            <div class="glass-card rounded-2xl p-4 transition-all duration-300">
+                <textarea id="inputText" placeholder="오타를 입력하세요..."
+                    class="w-full h-48 bg-transparent text-xl resize-none leading-relaxed placeholder-slate-600"></textarea>
+            </div>
+        </section>
+
+        <!-- Result Section -->
+        <section class="flex flex-col gap-3">
+            <label class="text-sm font-semibold text-slate-300 ml-1 flex justify-between">
+                <span><i class="fas fa-magic mr-1"></i> 변환 결과</span>
+                <span id="detectionMode" class="text-xs text-cyan-400 opacity-60">자동 감지 중...</span>
+            </label>
+            <div class="glass-card rounded-2xl p-4 relative group">
+                <textarea id="outputText" readonly placeholder="변환된 결과가 여기에 표시됩니다."
+                    class="w-full h-48 bg-transparent text-xl resize-none leading-relaxed text-cyan-300 cursor-default"></textarea>
+
+                <!-- Copy Button -->
+                <button id="copyBtn"
+                    class="absolute bottom-4 right-4 bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold py-2 px-4 rounded-xl flex items-center gap-2 transition-all active:scale-95 neon-shadow-cyan">
+                    <i class="fas fa-copy"></i> 복사하고 튀기
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Dashboard Section -->
+    <section class="w-full max-w-4xl mt-12 mb-8">
+        <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+            <i class="fas fa-trophy text-yellow-400"></i> 오늘의 오타 왕 🏆
+        </h2>
+        <div id="rankingContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <!-- Ranking items will be injected here -->
+            <div class="glass-card p-4 rounded-xl text-center border-dashed border-slate-700 opacity-50">
+                <p class="text-slate-500 text-sm">아직 기록이 없습니다.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="mt-auto py-8 text-slate-500 text-sm border-t border-slate-800 w-full text-center">
+        &copy; 2026 Rjfwk Recoverer. Built with <i class="fas fa-heart text-red-500 mx-1"></i> by rmfwk
+    </footer>
+
+    <!-- Toast Component -->
+    <div id="toast"
+        class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-cyan-400 text-slate-900 px-6 py-3 rounded-full font-bold shadow-2xl hidden z-50 toast">
+        복사 완료! 🚀
+    </div>
+
+    <!-- Script Logic -->
+    <script>
+        /**
+         * 한/영 오토마타 엔진 (AutomataEngine)
+         */
+        const AutomataEngine = (() => {
+            const KOR_CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+            const KOR_JUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ";
+            const KOR_JONG = " ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ";
+
+            const ENG_MAP = {
+                'q': 'ㅂ', 'w': 'ㅈ', 'e': 'ㄷ', 'r': 'ㄱ', 't': 'ㅅ', 'y': 'ㅛ', 'u': 'ㅕ', 'i': 'ㅑ', 'o': 'ㅐ', 'p': 'ㅔ',
+                'a': 'ㅁ', 's': 'ㄴ', 'd': 'ㅇ', 'f': 'ㄹ', 'g': 'ㅎ', 'h': 'ㅗ', 'j': 'ㅓ', 'k': 'ㅏ', 'l': 'ㅣ',
+                'z': 'ㅋ', 'x': 'ㅌ', 'c': 'ㅊ', 'v': 'ㅍ', 'b': 'ㅠ', 'n': 'ㅜ', 'm': 'ㅡ',
+                'Q': 'ㅃ', 'W': 'ㅉ', 'E': 'ㄸ', 'R': 'ㄲ', 'T': 'ㅆ', 'O': 'ㅒ', 'P': 'ㅖ'
+            };
+
+            const KOR_MAP = Object.entries(ENG_MAP).reduce((acc, [en, ko]) => { acc[ko] = en; return acc; }, {});
+
+            // 복합 모음/자음 결합 규칙
+            const COMPLEX_JUNG = { 'ㅗㅏ': 'ㅘ', 'ㅗㅐ': 'ㅙ', 'ㅗㅣ': 'ㅚ', 'ㅜㅓ': 'ㅝ', 'ㅜㅔ': 'ㅞ', 'ㅜㅣ': 'ㅟ', 'ㅡㅣ': 'ㅢ' };
+            const COMPLEX_JONG = { 'ㄱㅅ': 'ㄳ', 'ㄴㅈ': 'ㄵ', 'ㄴㅎ': 'ㄶ', 'ㄹㄱ': 'ㄺ', 'ㄹㅁ': 'ㄻ', 'ㄹㅂ': 'ㄼ', 'ㄹㅅ': 'ㄽ', 'ㄹㅌ': 'ㄾ', 'ㄹㅍ': 'ㄿ', 'ㄹㅎ': 'ㅀ', 'ㅂㅅ': 'ㅄ' };
+
+            /**
+             * English to Korean (QWERTY to Hangul)
+             */
+            const engToKor = (text) => {
+                let res = '';
+                let stack = [];
+
+                for (let char of text) {
+                    const ko = ENG_MAP[char] || char;
+                    if (!ENG_MAP[char]) { // Not a mappable character (space, special, etc)
+                        res += flushStack(stack) + char;
+                        stack = [];
+                        continue;
+                    }
+                    stack.push(ko);
+                }
+                res += flushStack(stack);
+                return res;
+            };
+
+            const flushStack = (stack) => {
+                if (stack.length === 0) return '';
+
+                const decomposed = [];
+                for (let c of stack) decomposed.push(c);
+
+                // 조합 알고리즘 (간단화된 로직)
+                let syllables = "";
+                let i = 0;
+                while (i < decomposed.length) {
+                    let choIdx = KOR_CHO.indexOf(decomposed[i]);
+                    if (choIdx !== -1) {
+                        let jungIdx = -1;
+                        if (i + 1 < decomposed.length) {
+                            let jung = decomposed[i + 1];
+                            // 복합 모음 체크
+                            if (i + 2 < decomposed.length && COMPLEX_JUNG[jung + decomposed[i + 2]]) {
+                                jung = COMPLEX_JUNG[jung + decomposed[i + 2]];
+                                jungIdx = KOR_JUNG.indexOf(jung);
+                                i += 2;
+                            } else {
+                                jungIdx = KOR_JUNG.indexOf(jung);
+                                i += 1;
+                            }
+                        }
+
+                        if (jungIdx !== -1) {
+                            let jongIdx = 0;
+                            if (i + 1 < decomposed.length) {
+                                // 다음 글자가 자음이고, 그 다음이 자음이면 받침일 가능성 있음
+                                let nextIsConsonant = KOR_CHO.indexOf(decomposed[i + 1]) !== -1;
+                                let afterNextIsVowel = i + 2 < decomposed.length && KOR_JUNG.indexOf(decomposed[i + 2]) !== -1;
+
+                                if (nextIsConsonant && !afterNextIsVowel) {
+                                    let jong = decomposed[i + 1];
+                                    // 복합 받침 체크
+                                    if (i + 2 < decomposed.length && COMPLEX_JONG[jong + decomposed[i + 2]]) {
+                                        let afterAfterNextIsVowel = i + 3 < decomposed.length && KOR_JUNG.indexOf(decomposed[i + 3]) !== -1;
+                                        if (!afterAfterNextIsVowel) {
+                                            jong = COMPLEX_JONG[jong + decomposed[i + 2]];
+                                            jongIdx = KOR_JONG.indexOf(jong);
+                                            i += 2;
+                                        } else {
+                                            // 복합 받침 중 앞부분만 받침으로
+                                            jongIdx = KOR_JONG.indexOf(jong);
+                                            i += 1;
+                                        }
+                                    } else {
+                                        jongIdx = KOR_JONG.indexOf(jong);
+                                        i += 1;
+                                    }
+                                }
+                            }
+                            syllables += String.fromCharCode(0xAC00 + (choIdx * 21 + jungIdx) * 28 + jongIdx);
+                        } else {
+                            syllables += decomposed[i - 1] || decomposed[i]; // 초성만 있고 중성 없는 경우
+                        }
+                    } else {
+                        syllables += decomposed[i];
+                    }
+                    i++;
+                }
+                return syllables;
+            };
+
+            /**
+             * Korean to English (Hangul to QWERTY)
+             */
+            const korToEng = (text) => {
+                let res = '';
+                for (let i = 0; i < text.length; i++) {
+                    let code = text.charCodeAt(i);
+                    if (code >= 0xAC00 && code <= 0xD7A3) { // Complete syllables
+                        let offset = code - 0xAC00;
+                        let jong = offset % 28;
+                        let jung = ((offset - jong) / 28) % 21;
+                        let cho = ((offset - jong) / 28 - jung) / 21;
+
+                        res += korCharToEng(KOR_CHO[cho]);
+                        res += korCharToEng(KOR_JUNG[jung]);
+                        if (jong > 0) res += korCharToEng(KOR_JONG[jong]);
+                    } else if (code >= 0x3131 && code <= 0x3163) { // Separate 자모
+                        res += korCharToEng(text[i]);
+                    } else {
+                        res += text[i];
+                    }
+                }
+                return res;
+            };
+
+            const korCharToEng = (ko) => {
+                // 복합 자모 분해
+                const JUNG_DEC = { 'ㅘ': 'ㅗㅏ', 'ㅙ': 'ㅗㅐ', 'ㅚ': 'ㅗㅣ', 'ㅝ': 'ㅜㅓ', 'ㅞ': 'ㅜㅔ', 'ㅟ': 'ㅜㅣ', 'ㅢ': 'ㅡㅣ' };
+                const JONG_DEC = { 'ㄳ': 'ㄱㅅ', 'ㄵ': 'ㄴㅈ', 'ㄶ': 'ㄴㅎ', 'ㄺ': 'ㄹㄱ', 'ㄻ': 'ㄹㅁ', 'ㄼ': 'ㄹㅂ', 'ㄽ': 'ㄹㅅ', 'ㄾ': 'ㄹㅌ', 'ㄿ': 'ㄹㅍ', 'ㅀ': 'ㄹㅎ', 'ㅄ': 'ㅂㅅ' };
+
+                let target = JUNG_DEC[ko] || JONG_DEC[ko] || ko;
+                let en = '';
+                for (let char of target) {
+                    en += KOR_MAP[char] || char;
+                }
+                return en;
+            };
+
+            return { engToKor, korToEng };
+        })();
+
+        /**
+         * UI 핸들러 & 이벤트 바인딩
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputArea = document.getElementById('inputText');
+            const outputArea = document.getElementById('outputText');
+            const copyBtn = document.getElementById('copyBtn');
+            const detectionMode = document.getElementById('detectionMode');
+            const rankingContainer = document.getElementById('rankingContainer');
+            const toast = document.getElementById('toast');
+
+            let lastInputTime = 0;
+
+            inputArea.addEventListener('input', (e) => {
+                const text = e.target.value;
+                if (!text) {
+                    outputArea.value = '';
+                    return;
+                }
+
+                // 스마트 감지: 한글이 포함되어 있는지 확인
+                const hasKor = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text);
+                let result = '';
+
+                if (hasKor) {
+                    detectionMode.textContent = "Korean to English";
+                    result = AutomataEngine.korToEng(text);
+                } else {
+                    detectionMode.textContent = "English to Korean";
+                    result = AutomataEngine.engToKor(text);
+                }
+
+                outputArea.value = result;
+            });
+
+            copyBtn.addEventListener('click', () => {
+                if (!outputArea.value) return;
+
+                // 텍스트 저장 (랭킹용)
+                RankingSystem.save(inputArea.value.trim(), outputArea.value.trim());
+                updateRankingUI();
+
+                // 클립보드 복사
+                navigator.clipboard.writeText(outputArea.value).then(() => {
+                    showToast();
+                    // 1초 뒤 리셋
+                    setTimeout(() => {
+                        inputArea.value = '';
+                        outputArea.value = '';
+                        detectionMode.textContent = "자동 감지 중...";
+                    }, 1000);
+                });
+            });
+
+            function showToast() {
+                toast.classList.remove('hidden');
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 2000);
+            }
+
+            /**
+             * 오타 랭킹 시스템 (RankingSystem)
+             */
+            const RankingSystem = {
+                save: (origin, converted) => {
+                    if (origin.length < 2 || origin.length > 20) return; // 너무 짧거나 긴건 제외
+
+                    const storageKey = 'rjfwk_rank';
+                    let data = JSON.parse(localStorage.getItem(storageKey) || '{}');
+
+                    const scoreKey = `${origin} → ${converted}`;
+                    data[scoreKey] = (data[scoreKey] || 0) + 1;
+
+                    localStorage.setItem(storageKey, JSON.stringify(data));
+                },
+                getTop5: () => {
+                    const data = JSON.parse(localStorage.getItem('rjfwk_rank') || '{}');
+                    return Object.entries(data)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 5);
+                }
+            };
+
+            function updateRankingUI() {
+                const top5 = RankingSystem.getTop5();
+                if (top5.length === 0) return;
+
+                rankingContainer.innerHTML = top5.map(([label, count], idx) => `
+                    <div class="glass-card p-4 rounded-xl flex flex-col items-center justify-center transition-all hover:scale-105 border-slate-700">
+                        <span class="text-xs font-bold text-slate-500 uppercase mb-1">Rank ${idx + 1}</span>
+                        <p class="text-sm font-medium truncate w-full text-center">${label}</p>
+                        <p class="text-cyan-400 font-bold mt-1 text-lg">${count}회</p>
+                    </div>
+                `).join('');
+            }
+
+            // 초기 실행
+            updateRankingUI();
+        });
+    </script>
+</body>
+
+</html>
