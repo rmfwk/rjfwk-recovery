@@ -145,6 +145,19 @@
 
     <!-- Script Logic -->
     <script>
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, function(tag) {
+                const charsToReplace = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+                };
+                return charsToReplace[tag] || tag;
+            });
+        }
         /**
          * 한/영 오토마타 엔진 (AutomataEngine)
          */
