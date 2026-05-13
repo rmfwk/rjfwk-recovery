@@ -395,11 +395,12 @@
 
                 rankingContainer.innerHTML = top5.map(([label, count], idx) => `
                     <div class="glass-card p-4 rounded-xl flex flex-col items-center justify-center transition-all hover:scale-105 border-slate-700">
-                        <span class="text-xs font-bold text-slate-500 uppercase mb-1">Rank ${idx + 1}</span>
-                        <p class="text-sm font-medium truncate w-full text-center">${label}</p>
-                        <p class="text-cyan-400 font-bold mt-1 text-lg">${count}회</p>
+                    <span class="text-xs font-bold text-slate-500 uppercase mb-1">Rank ${idx + 1}</span>
+                    <!-- label을 escapeHTML로 감싸서 출력 -->
+                    <p class="text-sm font-medium truncate w-full text-center">${escapeHTML(label)}</p>
+                    <p class="text-cyan-400 font-bold mt-1 text-lg">${count}회</p>
                     </div>
-                `).join('');
+                    `).join('');
             }
 
             // 초기 실행
