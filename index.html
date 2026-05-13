@@ -369,25 +369,55 @@
             /**
              * 오타 랭킹 시스템 (RankingSystem)
              */
-            const RankingSystem = {
-                save: (origin, converted) => {
-                    if (origin.length < 2 || origin.length > 20) return; // 너무 짧거나 긴건 제외
+            /**
+ * 개선된 오타 랭킹 시스템 (RankingSystem)
+ * - 프로토타입 오염 방지 (Object.create(null))
+ * - 데이터 개수 제한 (용량 관리 및 최적화)
+ */
+const RankingSystem = {
+    STORAGE_KEY: 'rjfwk_rank',
+    MAX_ITEMS: 50, // 저장할 최대 오타 종류 개수
 
-                    const storageKey = 'rjfwk_rank';
-                    let data = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    // 데이터를 가져올 때 프로토타입이 없는 깨끗한 객체로 생성
+    _getData: () => {
+        try {
+            const rawData = localStorage.getItem(RankingSystem.STORAGE_KEY);
+            const parsed = JSON.parse(rawData || '{}');
+            // Object.create(null)을 사용하여 __proto__ 등 상속된 속성 공격 차단
+            return Object.assign(Object.create(null), parsed);
+        } catch (e) {
+            return Object.create(null);
+        }
+    },
 
-                    const scoreKey = `${origin} → ${converted}`;
-                    data[scoreKey] = (data[scoreKey] || 0) + 1;
+    save: (origin, converted) => {
+        if (origin.length < 2 || origin.length > 20) return;
 
-                    localStorage.setItem(storageKey, JSON.stringify(data));
-                },
-                getTop5: () => {
-                    const data = JSON.parse(localStorage.getItem('rjfwk_rank') || '{}');
-                    return Object.entries(data)
-                        .sort((a, b) => b[1] - a[1])
-                        .slice(0, 5);
-                }
-            };
+        let data = RankingSystem._getData();
+        const scoreKey = `${origin} → ${converted}`;
+        
+        // 데이터 추가 또는 횟수 증가
+        data[scoreKey] = (data[scoreKey] || 0) + 1;
+
+        // [용량 관리 로직] 데이터 개수가 MAX_ITEMS를 초과하면 가장 횟수가 적은 것부터 삭제
+        let entries = Object.entries(data);
+        if (entries.length > RankingSystem.MAX_ITEMS) {
+            // 횟수(count) 기준 오름차순 정렬
+            entries.sort((a, b) => a[1] - b[1]);
+            // 가장 적은 데이터 삭제
+            delete data[entries[0][0]];
+        }
+
+        localStorage.setItem(RankingSystem.STORAGE_KEY, JSON.stringify(data));
+    },
+
+    getTop5: () => {
+        const data = RankingSystem._getData();
+        return Object.entries(data)
+            .sort((a, b) => b[1] - a[1]) // 횟수 내림차순
+            .slice(0, 5);
+    }
+};
 
             function updateRankingUI() {
                 const top5 = RankingSystem.getTop5();
